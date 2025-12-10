@@ -72,22 +72,227 @@
         color: #00ffff;
         margin-top: 10px;
       }
+
+      /* Lobby UI */
+      #lobby {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #00ffff;
+        padding: 30px;
+        text-align: center;
+        z-index: 100;
+        color: #00ffff;
+        min-width: 300px;
+      }
+
+      #lobby button {
+        background: #00ffff;
+        color: #000;
+        border: none;
+        padding: 10px 20px;
+        font-family: "Courier New", monospace;
+        font-weight: bold;
+        cursor: pointer;
+        margin: 10px;
+        font-size: 16px;
+      }
+
+      #lobby input {
+        background: #000;
+        border: 1px solid #00ffff;
+        color: #00ffff;
+        padding: 10px;
+        font-family: "Courier New", monospace;
+        margin: 10px;
+        font-size: 16px;
+        width: 200px;
+      }
+
+      #lobbyStatus {
+        margin-top: 15px;
+        color: #ffff00;
+      }
+
+      /* Leaderboard */
+      #leaderboard {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #00ffff;
+        padding: 10px;
+        color: #00ffff;
+        z-index: 10;
+        min-width: 200px;
+        transition: all 1s ease-in-out;
+      }
+
+      #leaderboard.centered {
+        top: 50%;
+        left: 50%;
+        right: auto;
+        transform: translate(-50%, -50%);
+        width: 500px;
+        font-size: 24px;
+        background: rgba(0, 0, 0, 0.9);
+        border: 2px solid #00ffff;
+        padding: 30px;
+      }
+
+      #restartBtn {
+        display: none;
+        margin-top: 20px;
+        background: #00ff00;
+        color: #000;
+        border: none;
+        padding: 10px 20px;
+        font-size: 20px;
+        cursor: pointer;
+        width: 100%;
+        font-family: "Courier New", monospace;
+        font-weight: bold;
+      }
+
+      .player-label {
+        position: absolute;
+        color: #00ffff;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 12px;
+        pointer-events: none;
+        transform: translate(-50%, -100%);
+      }
+
+      /* F1 Timer Style */
+      #timerContainer {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #000;
+        border: 2px solid #fff;
+        padding: 10px 20px;
+        z-index: 10;
+        text-align: center;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+      }
+
+      #timerLabel {
+        color: #fff;
+        font-size: 14px;
+        letter-spacing: 2px;
+        margin-bottom: 5px;
+      }
+
+      #timerDisplay {
+        color: #ff0000;
+        font-size: 48px;
+        font-weight: bold;
+        font-family: "Arial Black", sans-serif;
+        text-shadow: 0 0 10px #ff0000;
+      }
+
+      /* Highlighted Leaderboard */
+      .leaderboard-item {
+        padding: 5px;
+        border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+      }
+      .leaderboard-item.highlight {
+        background: rgba(0, 255, 255, 0.3);
+        font-weight: bold;
+        color: #ffffff;
+      }
+      .leaderboard-item.winner {
+        color: #ffff00;
+        text-shadow: 0 0 5px #ffff00;
+      }
+
+      .badge {
+        font-size: 10px;
+        padding: 2px 4px;
+        border-radius: 3px;
+        margin: 0 5px;
+        font-weight: bold;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .badge.crash {
+        background: #ff0000;
+        color: #fff;
+      }
+      .badge.race {
+        background: #00ff00;
+        color: #000;
+      }
+      .badge.finish {
+        background: #ffff00;
+        color: #000;
+      }
     </style>
   </head>
   <body>
+    <div id="timerContainer" style="display: none">
+      <div id="timerLabel">TIME REMAINING</div>
+      <div id="timerDisplay">60</div>
+    </div>
+
+    <div id="lobby">
+      <h2>MULTIPLAYER LOBBY</h2>
+      <input
+        type="text"
+        id="playerNameInput"
+        placeholder="Enter Your Name"
+        maxlength="10"
+      />
+      <br />
+      <button id="createBtn">Create Room</button>
+      <br />
+      <input type="text" id="roomIdInput" placeholder="Enter Room ID" />
+      <button id="joinBtn">Join Room</button>
+      <br />
+      <button
+        id="startBtn"
+        style="
+          display: none;
+          background: #00ff00;
+          color: #000;
+          margin-top: 20px;
+        "
+      >
+        START GAME
+      </button>
+      <div id="lobbyStatus">Waiting for action...</div>
+    </div>
+
+    <div id="leaderboard">
+      <h3>LEADERBOARD</h3>
+      <div id="leaderboardList"></div>
+      <button id="restartBtn">RESTART GAME</button>
+    </div>
+
     <div id="hud">
       <div>SPEED: <span id="speed">0</span> km/h</div>
       <div>DISTANCE: <span id="distance">0</span> m</div>
       <div>ENEMIES HIT: <span id="hits">0</span></div>
       <div>KICK: <span id="kickStatus" class="ready">READY</span></div>
+      <div id="roomHud" style="display: none; color: #ffff00; margin-top: 10px">
+        ROOM: <span id="roomIdDisplay"></span>
+      </div>
     </div>
 
     <div id="gameOver">
       <div>GAME OVER</div>
+      <div>TIME'S UP!</div>
       <div>Final Distance: <span id="finalDistance">0</span> m</div>
       <div>Press R to Restart</div>
     </div>
 
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script type="importmap">
       {
         "imports": {
@@ -102,8 +307,303 @@
       import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
       import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
+      // Network State
+      const network = {
+        peer: null,
+        connections: [], // Array of connections (for Host)
+        conn: null, // Single connection (for Client)
+        isHost: false,
+        id: null,
+        name: "Player",
+        status: "RACING",
+        otherPlayers: {}, // { id: { mesh: THREE.Group, targetX: 0, targetZ: 0, distance: 0, label: HTMLElement, name: String } }
+        lastUpdate: 0,
+      };
+
+      // Clear Room ID on load
+      localStorage.removeItem("road_rash_room_id");
+
+      // Lobby Logic
+      const lobby = document.getElementById("lobby");
+      const status = document.getElementById("lobbyStatus");
+      const createBtn = document.getElementById("createBtn");
+      const joinBtn = document.getElementById("joinBtn");
+      const roomIdInput = document.getElementById("roomIdInput");
+      const playerNameInput = document.getElementById("playerNameInput");
+      const startBtn = document.getElementById("startBtn");
+      const restartBtn = document.getElementById("restartBtn");
+
+      startBtn.addEventListener("click", () => {
+        if (network.isHost) {
+          startGame();
+          // Broadcast Start
+          network.connections.forEach((conn) => {
+            if (conn.open) conn.send({ type: "START_GAME" });
+          });
+        }
+      });
+
+      restartBtn.addEventListener("click", () => {
+        restartGame();
+        // Broadcast Reset
+        network.connections.forEach((conn) => {
+          if (conn.open) conn.send({ type: "RESET_GAME" });
+        });
+      });
+
+      function startGame() {
+        lobby.style.display = "none";
+        document.getElementById("timerContainer").style.display = "block";
+        gameState.started = true;
+        network.status = "RACING";
+        startTimer();
+      }
+
+      function startTimer() {
+        const timerInterval = setInterval(() => {
+          if (gameState.gameOver) {
+            clearInterval(timerInterval);
+            return;
+          }
+          gameState.timer--;
+          document.getElementById("timerDisplay").textContent = gameState.timer;
+
+          if (gameState.timer <= 10) {
+            document.getElementById("timerDisplay").style.color = "#ff0000";
+          } else {
+            document.getElementById("timerDisplay").style.color = "#00ff00";
+          }
+
+          if (gameState.timer <= 0) {
+            clearInterval(timerInterval);
+            gameState.finishing = true;
+            spawnFinishLine();
+          }
+        }, 1000);
+      }
+
+      let finishLine = null;
+      function spawnFinishLine() {
+        const group = new THREE.Group();
+
+        // Checkered Banner
+        const textureSize = 64;
+        const canvas = document.createElement("canvas");
+        canvas.width = textureSize;
+        canvas.height = textureSize;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, textureSize, textureSize);
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, textureSize / 2, textureSize / 2);
+        ctx.fillRect(
+          textureSize / 2,
+          textureSize / 2,
+          textureSize / 2,
+          textureSize / 2
+        );
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(10, 2);
+
+        const bannerGeo = new THREE.PlaneGeometry(30, 4);
+        const bannerMat = new THREE.MeshBasicMaterial({
+          map: texture,
+          side: THREE.DoubleSide,
+        });
+        const banner = new THREE.Mesh(bannerGeo, bannerMat);
+        banner.position.y = 4;
+        group.add(banner);
+
+        // Poles
+        const poleGeo = new THREE.CylinderGeometry(0.2, 0.2, 8);
+        const poleMat = new THREE.MeshBasicMaterial({ color: 0x888888 });
+
+        const leftPole = new THREE.Mesh(poleGeo, poleMat);
+        leftPole.position.set(-15, 2, 0);
+        group.add(leftPole);
+
+        const rightPole = new THREE.Mesh(poleGeo, poleMat);
+        rightPole.position.set(15, 2, 0);
+        group.add(rightPole);
+
+        // "FINISH" Text (Simple Box for now)
+        const textGeo = new THREE.BoxGeometry(10, 2, 0.5);
+        const textMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const textMesh = new THREE.Mesh(textGeo, textMat);
+        textMesh.position.y = 6;
+        group.add(textMesh);
+
+        // Spawn far ahead
+        group.position.set(0, 0, -200);
+        scene.add(group);
+        finishLine = group;
+      }
+
+      function finishGame() {
+        gameState.gameOver = true;
+        gameState.started = false;
+        network.status = "FINISHED";
+        document.getElementById("timerContainer").style.display = "none";
+
+        // Move Leaderboard
+        const lb = document.getElementById("leaderboard");
+        lb.classList.add("centered");
+
+        // Show Restart Button for Host
+        if (network.isHost) {
+          document.getElementById("restartBtn").style.display = "block";
+        }
+      }
+
+      function generateId() {
+        return Math.random().toString(36).substring(2, 6).toUpperCase();
+      }
+
+      createBtn.addEventListener("click", () => {
+        const name = playerNameInput.value.trim();
+        if (!name) {
+          status.textContent = "Please enter your name";
+          return;
+        }
+        network.name = name;
+        const id = generateId();
+        network.isHost = true;
+        initPeer(id);
+      });
+
+      joinBtn.addEventListener("click", () => {
+        const name = playerNameInput.value.trim();
+        if (!name) {
+          status.textContent = "Please enter your name";
+          return;
+        }
+        network.name = name;
+        const id = roomIdInput.value.toUpperCase();
+        if (id.length === 4) {
+          network.isHost = false;
+          initPeer(null, id);
+        } else {
+          status.textContent = "Invalid Room ID";
+        }
+      });
+
+      function initPeer(id, hostIdToConnect) {
+        status.textContent = "Initializing Peer...";
+        network.peer = new Peer(id);
+
+        network.peer.on("open", (myId) => {
+          network.id = myId;
+          status.textContent = `Connected! ID: ${myId}`;
+
+          if (network.isHost) {
+            status.textContent += " (HOST) - Waiting for players...";
+            startBtn.style.display = "inline-block";
+
+            // Show Room ID in HUD
+            const roomDisplay = document.getElementById("roomIdDisplay");
+            const roomHud = document.getElementById("roomHud");
+            roomDisplay.textContent = myId;
+            roomHud.style.display = "block";
+
+            // Store in localStorage
+            localStorage.setItem("road_rash_room_id", myId);
+          } else {
+            status.textContent += ` - Connecting to ${hostIdToConnect}...`;
+            const conn = network.peer.connect(hostIdToConnect);
+            setupConnection(conn);
+
+            // Show Joined Room ID
+            const roomDisplay = document.getElementById("roomIdDisplay");
+            const roomHud = document.getElementById("roomHud");
+            roomDisplay.textContent = hostIdToConnect;
+            roomHud.style.display = "block";
+          }
+        });
+
+        network.peer.on("connection", (conn) => {
+          if (network.isHost) {
+            setupConnection(conn);
+          }
+        });
+
+        network.peer.on("error", (err) => {
+          status.textContent = "Error: " + err.type;
+        });
+      }
+
+      function setupConnection(conn) {
+        if (network.isHost) {
+          network.connections.push(conn);
+        } else {
+          network.conn = conn;
+        }
+
+        conn.on("open", () => {
+          console.log("Connection established!");
+          if (!network.isHost) {
+            status.textContent = "Connected! Waiting for Host to start...";
+          }
+        });
+
+        conn.on("data", (data) => {
+          handleNetworkData(data);
+        });
+      }
+
+      function handleNetworkData(data) {
+        if (data.type === "START_GAME") {
+          startGame();
+        } else if (data.type === "RESET_GAME") {
+          restartGame();
+        } else if (data.type === "UPDATE") {
+          // Update other player position
+          if (!network.otherPlayers[data.id]) {
+            createNetworkPlayer(data.id, data.name);
+          }
+          const p = network.otherPlayers[data.id];
+          p.targetX = data.x;
+          p.targetZ = data.z;
+          p.distance = data.distance;
+          p.hits = data.hits;
+          p.status = data.status;
+          if (data.name) {
+            p.name = data.name;
+            p.label.textContent = data.name;
+          }
+        } else if (data.type === "LEADERBOARD") {
+          updateLeaderboardUI(data.list);
+        }
+      }
+
+      function createNetworkPlayer(id, name) {
+        const bike = createBike(0x0000ff); // Blue for network players
+        bike.position.set(0, 0, 0);
+        scene.add(bike);
+
+        // Create Label
+        const label = document.createElement("div");
+        label.className = "player-label";
+        label.textContent = name || `Player ${id}`;
+        document.body.appendChild(label);
+
+        network.otherPlayers[id] = {
+          mesh: bike,
+          targetX: 0,
+          targetZ: 0,
+          distance: 0,
+          label: label,
+          name: name || `Player ${id}`,
+        };
+      }
+
       // Game State
       const gameState = {
+        started: false,
+        timer: 60,
+        finishing: false,
         speed: 0,
         maxSpeed: 150,
         acceleration: 0.1,
@@ -429,7 +929,7 @@
 
       // Handle Player Input
       function handleInput() {
-        if (gameState.gameOver) return;
+        if (!gameState.started || gameState.gameOver) return;
 
         // Lateral movement
         const moveSpeed = 0.15;
@@ -481,7 +981,7 @@
 
       // Update Environment
       function updateEnvironment() {
-        if (gameState.gameOver) return;
+        if (!gameState.started || gameState.gameOver) return;
 
         // Physics Logic
         if (keys.up) {
@@ -499,6 +999,14 @@
 
         const speedFactor = gameState.speed / 60;
         gameState.distance += gameState.speed * 0.01;
+
+        // Move Finish Line
+        if (gameState.finishing && finishLine) {
+          finishLine.position.z += speedFactor;
+          if (finishLine.position.z > player.position.z) {
+            finishGame();
+          }
+        }
 
         // Move road segments
         roadSegments.forEach((segment) => {
@@ -671,6 +1179,7 @@
       function triggerGameOver() {
         if (gameState.gameOver) return;
         gameState.gameOver = true;
+        network.status = "CRASHED";
         document.getElementById("gameOver").style.display = "block";
         document.getElementById("finalDistance").textContent = Math.floor(
           gameState.distance
@@ -687,6 +1196,20 @@
         gameState.playerHealth = 3;
         gameState.roadCurvature = 0;
         gameState.targetCurvature = 0;
+        gameState.timer = 60;
+        gameState.started = false;
+        gameState.finishing = false;
+        network.status = "RACING";
+
+        // Reset Leaderboard UI
+        const lb = document.getElementById("leaderboard");
+        lb.classList.remove("centered");
+        document.getElementById("restartBtn").style.display = "none";
+
+        if (finishLine) {
+          scene.remove(finishLine);
+          finishLine = null;
+        }
 
         player.position.set(0, 0, 0);
 
@@ -732,6 +1255,16 @@
         });
 
         document.getElementById("gameOver").style.display = "none";
+
+        // Show Lobby again
+        lobby.style.display = "block";
+        if (network.isHost) {
+          startBtn.style.display = "inline-block";
+          status.textContent = "Host - Waiting to Start...";
+        } else {
+          startBtn.style.display = "none";
+          status.textContent = "Waiting for Host to start...";
+        }
       }
 
       // Window Resize Handler
@@ -748,8 +1281,123 @@
         handleInput();
         updateEnvironment();
         updateHUD();
+        updateNetwork();
 
         composer.render();
+      }
+
+      function updateNetwork() {
+        // Send my position
+        const now = Date.now();
+        if (network.id && now - network.lastUpdate > 50) {
+          const data = {
+            type: "UPDATE",
+            id: network.id,
+            name: network.name,
+            x: player.position.x,
+            z: player.position.z,
+            distance: gameState.distance,
+            hits: gameState.enemiesHit,
+            status: network.status,
+          };
+
+          if (network.isHost) {
+            // Host: Broadcast to all clients
+            network.connections.forEach((conn) => {
+              if (conn.open) conn.send(data);
+            });
+
+            // Host: Calculate and Broadcast Leaderboard
+            const list = [
+              {
+                id: network.name,
+                dist: Math.floor(gameState.distance),
+                hits: gameState.enemiesHit,
+                status: network.status,
+              },
+            ];
+            Object.keys(network.otherPlayers).forEach((id) => {
+              list.push({
+                id: network.otherPlayers[id].name,
+                dist: Math.floor(network.otherPlayers[id].distance),
+                hits: network.otherPlayers[id].hits || 0,
+                status: network.otherPlayers[id].status || "RACING",
+              });
+            });
+
+            list.sort((a, b) => {
+              if (b.hits !== a.hits) return b.hits - a.hits;
+              return b.dist - a.dist;
+            });
+
+            // Update local UI
+            updateLeaderboardUI(list);
+
+            // Send to clients
+            const lbData = { type: "LEADERBOARD", list: list };
+            network.connections.forEach((conn) => {
+              if (conn.open) conn.send(lbData);
+            });
+          } else {
+            // Client: Send to Host
+            if (network.conn && network.conn.open) {
+              network.conn.send(data);
+            }
+          }
+          network.lastUpdate = now;
+        }
+
+        // Update Network Players
+        Object.keys(network.otherPlayers).forEach((id) => {
+          const p = network.otherPlayers[id];
+          // Lerp position
+          p.mesh.position.x += (p.targetX - p.mesh.position.x) * 0.1;
+          p.mesh.position.z += (p.targetZ - p.mesh.position.z) * 0.1;
+
+          // Update Label Position
+          const vector = p.mesh.position.clone();
+          vector.y += 2; // Above bike
+          vector.project(camera);
+
+          const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+          const y = (-(vector.y * 0.5) + 0.5) * window.innerHeight;
+
+          p.label.style.left = `${x}px`;
+          p.label.style.top = `${y}px`;
+
+          // Hide if behind camera
+          if (vector.z > 1) {
+            p.label.style.display = "none";
+          } else {
+            p.label.style.display = "block";
+          }
+        });
+      }
+
+      function updateLeaderboardUI(list) {
+        const html = list
+          .map((p, i) => {
+            let classes = "leaderboard-item";
+            if (i === 0) classes += " winner";
+            if (p.id === network.name) classes += " highlight";
+
+            let statusBadge = "";
+            if (p.status === "CRASHED") {
+              statusBadge = '<span class="badge crash">CRASHED</span>';
+            } else if (p.status === "FINISHED") {
+              statusBadge = '<span class="badge finish">FINISHED</span>';
+            } else {
+              statusBadge = '<span class="badge race">RACING</span>';
+            }
+
+            return `<div class="${classes}">
+                <span>${i + 1}. ${p.id}</span>
+                ${statusBadge}
+                <span>[${p.hits} Hits] (${p.dist}m)</span>
+            </div>`;
+          })
+          .join("");
+        document.getElementById("leaderboardList").innerHTML = html;
       }
 
       // Start the game
