@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Road Rash 3D - Combat Racer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        overflow: hidden;
+        font-family: "Courier New", monospace;
+        background: #000;
+      }
+
+      #gameCanvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      #hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: #00ffff;
+        font-size: 18px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 15px;
+        border: 2px solid #00ffff;
+        border-radius: 5px;
+      }
+
+      #hud div {
+        margin-bottom: 5px;
+      }
+
+      .ready {
+        color: #00ff00;
+      }
+
+      .cooldown {
+        color: #ff0000;
+      }
+
+      #gameOver {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #ff0000;
+        font-size: 48px;
+        text-shadow: 3px 3px 6px rgba(0, 0, 0, 1);
+        display: none;
+        z-index: 20;
+        text-align: center;
+      }
+
+      #gameOver div:first-child {
+        font-size: 64px;
+        margin-bottom: 20px;
+      }
+
+      #gameOver div:last-child {
+        font-size: 24px;
+        color: #00ffff;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <div>SPEED: <span id="speed">0</span> km/h</div>
+      <div>DISTANCE: <span id="distance">0</span> m</div>
+      <div>ENEMIES HIT: <span id="hits">0</span></div>
+      <div>KICK: <span id="kickStatus" class="ready">READY</span></div>
+    </div>
+
+    <div id="gameOver">
+      <div>GAME OVER</div>
+      <div>Final Distance: <span id="finalDistance">0</span> m</div>
+      <div>Press R to Restart</div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module">
+      import * as THREE from "three";
+      import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+      import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+      import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+
+      // Game State
+      const gameState = {
+        speed: 0,
+        maxSpeed: 150,
+        acceleration: 0.1,
+        friction: 0.05,
+        braking: 0.3,
+        distance: 0,
+        enemiesHit: 0,
+        kickCooldown: 0,
+        kickCooldownMax: 30,
+        gameOver: false,
+        playerHealth: 3,
+        roadCurvature: 0,
+        targetCurvature: 0,
+        curveTimer: 0,
+      };
+
+      // Input State
+      const keys = {
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        space: false,
+      };
+
+      // Scene Setup
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
+      scene.fog = new THREE.Fog(0x000000, 10, 100);
+
+      // Camera Setup
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(0, 5, 10);
+      camera.lookAt(0, 0, -10);
+
+      // Renderer Setup
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.body.appendChild(renderer.domElement);
+
+      // Post-Processing
+      const renderScene = new RenderPass(scene, camera);
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        1.5, // strength
+        0.4, // radius
+        0.1 // threshold
+      );
+
+      const composer = new EffectComposer(renderer);
+      composer.addPass(renderScene);
+      composer.addPass(bloomPass);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 2);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 10, 5);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.camera.left = -50;
+      directionalLight.shadow.camera.right = 50;
+      directionalLight.shadow.camera.top = 50;
+      directionalLight.shadow.camera.bottom = -50;
+      scene.add(directionalLight);
+
+      // Create Bike Function
+      function createBike(color) {
+        const bike = new THREE.Group();
+        const neonMaterial = new THREE.LineBasicMaterial({ color: color });
+        const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+        // Main body
+        const bodyGeometry = new THREE.BoxGeometry(1, 0.5, 2);
+        const body = new THREE.Mesh(bodyGeometry, blackMaterial);
+        const bodyEdges = new THREE.EdgesGeometry(bodyGeometry);
+        const bodyLines = new THREE.LineSegments(bodyEdges, neonMaterial);
+        body.add(bodyLines);
+        bike.add(body);
+
+        // Handlebars
+        const handleGeometry = new THREE.BoxGeometry(1.2, 0.1, 0.1);
+        const handle = new THREE.Mesh(handleGeometry, blackMaterial);
+        const handleEdges = new THREE.EdgesGeometry(handleGeometry);
+        const handleLines = new THREE.LineSegments(handleEdges, neonMaterial);
+        handle.add(handleLines);
+        handle.position.set(0, 0.3, -0.7);
+        bike.add(handle);
+
+        // Wheels
+        const wheelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16);
+        wheelGeometry.rotateZ(Math.PI / 2);
+
+        const wheelEdges = new THREE.EdgesGeometry(wheelGeometry);
+        const wheelLines = new THREE.LineSegments(wheelEdges, neonMaterial);
+
+        const frontWheel = new THREE.Group();
+        const frontWheelMesh = new THREE.Mesh(wheelGeometry, blackMaterial);
+        frontWheel.add(frontWheelMesh);
+        frontWheel.add(wheelLines.clone());
+        frontWheel.position.set(0, -0.3, -0.8);
+        bike.add(frontWheel);
+
+        const backWheel = new THREE.Group();
+        const backWheelMesh = new THREE.Mesh(wheelGeometry, blackMaterial);
+        backWheel.add(backWheelMesh);
+        backWheel.add(wheelLines.clone());
+        backWheel.position.set(0, -0.3, 0.8);
+        bike.add(backWheel);
+
+        bike.userData.wheels = [frontWheel, backWheel];
+        bike.userData.originalColor = color;
+        bike.userData.bodyLines = bodyLines;
+        bike.userData.body = body;
+
+        return bike;
+      }
+
+      // Create Player
+      const player = createBike(0x00ffff);
+      player.position.set(0, 0, 0);
+      scene.add(player);
+
+      // Enemies Array
+      const enemies = [];
+      const maxEnemies = 5;
+
+      function spawnEnemy() {
+        const enemy = createBike(0xff00ff);
+        const lane = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2);
+        enemy.position.set(lane, 0, -30 - Math.random() * 50);
+        enemy.userData.velocity = 0.1 + Math.random() * 0.1;
+        enemy.userData.lane = lane;
+        enemy.userData.hit = false;
+        scene.add(enemy);
+        enemies.push(enemy);
+      }
+
+      // Spawn initial enemies
+      for (let i = 0; i < maxEnemies; i++) {
+        spawnEnemy();
+      }
+
+      // Obstacles Array
+      const obstacles = [];
+      const maxObstacles = 15;
+
+      function spawnObstacle() {
+        const type = Math.random() > 0.5 ? "rock" : "tree";
+        let mesh;
+        const neonMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 }); // Yellow
+        const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+        if (type === "rock") {
+          const geometry = new THREE.BoxGeometry(1, 1, 1);
+          const base = new THREE.Mesh(geometry, blackMaterial);
+          const edges = new THREE.EdgesGeometry(geometry);
+          const lines = new THREE.LineSegments(edges, neonMaterial);
+          base.add(lines);
+          mesh = base;
+        } else {
+          mesh = new THREE.Group();
+
+          // Trunk
+          const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 2, 8);
+          const trunkBase = new THREE.Mesh(trunkGeometry, blackMaterial);
+          const trunkEdges = new THREE.EdgesGeometry(trunkGeometry);
+          const trunkLines = new THREE.LineSegments(trunkEdges, neonMaterial);
+          trunkBase.add(trunkLines);
+          mesh.add(trunkBase);
+
+          // Leaves
+          const leavesGeometry = new THREE.IcosahedronGeometry(0.8, 1);
+          const leavesBase = new THREE.Mesh(leavesGeometry, blackMaterial);
+          const leavesEdges = new THREE.EdgesGeometry(leavesGeometry);
+          const leavesLines = new THREE.LineSegments(leavesEdges, neonMaterial);
+          leavesBase.add(leavesLines);
+          leavesBase.position.y = 1.5;
+          mesh.add(leavesBase);
+        }
+
+        const side = Math.random() > 0.5 ? 1 : -1;
+        mesh.position.set(
+          side * (5 + Math.random() * 3),
+          type === "rock" ? 0.5 : 1,
+          -30 - Math.random() * 70
+        );
+        mesh.castShadow = true;
+        mesh.userData.type = type;
+        scene.add(mesh);
+        obstacles.push(mesh);
+      }
+
+      // Spawn initial obstacles
+      for (let i = 0; i < maxObstacles; i++) {
+        spawnObstacle();
+      }
+
+      // Traffic Cars
+      const trafficCars = [];
+      const maxTraffic = 3;
+
+      function createCar() {
+        const carGroup = new THREE.Group();
+        const neonMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 }); // Neon Yellow
+        const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+        // Body (Lower)
+        const bodyGeo = new THREE.BoxGeometry(2, 0.8, 4);
+        const bodyMesh = new THREE.Mesh(bodyGeo, blackMaterial);
+        const bodyEdges = new THREE.EdgesGeometry(bodyGeo);
+        const bodyLines = new THREE.LineSegments(bodyEdges, neonMaterial);
+        bodyMesh.add(bodyLines);
+        bodyMesh.position.y = 0.4;
+        carGroup.add(bodyMesh);
+
+        // Cabin (Upper)
+        const cabinGeo = new THREE.BoxGeometry(1.8, 0.6, 2);
+        const cabinMesh = new THREE.Mesh(cabinGeo, blackMaterial);
+        const cabinEdges = new THREE.EdgesGeometry(cabinGeo);
+        const cabinLines = new THREE.LineSegments(cabinEdges, neonMaterial);
+        cabinMesh.add(cabinLines);
+        cabinMesh.position.y = 1.1;
+        carGroup.add(cabinMesh);
+
+        return carGroup;
+      }
+
+      function spawnTrafficCar() {
+        const car = createCar();
+        const lane = (Math.random() > 0.5 ? 1 : -1) * 5; // Left (-5) or Right (+5)
+        const z = -100 - Math.random() * 200; // Spawn far ahead
+
+        car.position.set(lane, 0, z);
+        car.userData.lane = lane;
+        car.userData.speed = 0.1 + Math.random() * 0.1; // Slower traffic speed
+
+        scene.add(car);
+        trafficCars.push(car);
+      }
+
+      // Spawn initial traffic
+      for (let i = 0; i < maxTraffic; i++) {
+        spawnTrafficCar();
+      }
+
+      // Create Road
+      const roadSegments = [];
+      const segmentCount = 40;
+      const segmentLength = 5;
+      const roadWidth = 20;
+
+      function createRoadSegment() {
+        const group = new THREE.Group();
+
+        // Grid floor
+        const roadGeometry = new THREE.PlaneGeometry(
+          roadWidth,
+          segmentLength,
+          3,
+          1
+        );
+        const roadMaterial = new THREE.MeshBasicMaterial({
+          color: 0x0000ff, // Neon Blue/Purple
+          wireframe: true,
+        });
+        const road = new THREE.Mesh(roadGeometry, roadMaterial);
+        road.rotation.x = -Math.PI / 2;
+
+        // Center line
+        const lineGeometry = new THREE.PlaneGeometry(0.1, segmentLength);
+        const lineMaterial = new THREE.MeshBasicMaterial({
+          color: 0xffff00,
+        });
+        const centerLine = new THREE.Mesh(lineGeometry, lineMaterial);
+        centerLine.rotation.x = -Math.PI / 2;
+        centerLine.position.y = 0.01;
+
+        group.add(road);
+        group.add(centerLine);
+
+        return group;
+      }
+
+      // Initialize road segments
+      for (let i = 0; i < segmentCount; i++) {
+        const segment = createRoadSegment();
+        segment.userData.worldZ = -i * segmentLength;
+        segment.position.set(0, -0.5, -i * segmentLength);
+        roadSegments.push(segment);
+        scene.add(segment);
+      }
+
+      // Input Handlers
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") keys.left = true;
+        if (e.key === "ArrowRight") keys.right = true;
+        if (e.key === "ArrowUp") keys.up = true;
+        if (e.key === "ArrowDown") keys.down = true;
+        if (e.key === " ") {
+          e.preventDefault();
+          keys.space = true;
+        }
+        if (e.key === "r" || e.key === "R") {
+          if (gameState.gameOver) restartGame();
+        }
+      });
+
+      document.addEventListener("keyup", (e) => {
+        if (e.key === "ArrowLeft") keys.left = false;
+        if (e.key === "ArrowRight") keys.right = false;
+        if (e.key === "ArrowUp") keys.up = false;
+        if (e.key === "ArrowDown") keys.down = false;
+        if (e.key === " ") keys.space = false;
+      });
+
+      // Handle Player Input
+      function handleInput() {
+        if (gameState.gameOver) return;
+
+        // Lateral movement
+        const moveSpeed = 0.15;
+        if (keys.left && player.position.x > -6) {
+          player.position.x -= moveSpeed;
+        }
+        if (keys.right && player.position.x < 6) {
+          player.position.x += moveSpeed;
+        }
+
+        // Attack
+        if (keys.space && gameState.kickCooldown === 0) {
+          performKick();
+          gameState.kickCooldown = gameState.kickCooldownMax;
+        }
+
+        // Update cooldown
+        if (gameState.kickCooldown > 0) {
+          gameState.kickCooldown--;
+        }
+      }
+
+      // Perform Kick Attack
+      function performKick() {
+        const kickRange = 3;
+        const kickDistance = 5;
+
+        enemies.forEach((enemy) => {
+          const dx = Math.abs(enemy.position.x - player.position.x);
+          const dz = Math.abs(enemy.position.z - player.position.z);
+
+          if (dx < kickRange && dz < kickDistance && !enemy.userData.hit) {
+            // Push enemy sideways
+            const pushDirection = enemy.position.x > player.position.x ? 1 : -1;
+            enemy.userData.pushVelocity = pushDirection * 0.3;
+
+            // Flash effect
+            const originalColor = enemy.userData.originalColor;
+            enemy.userData.bodyLines.material.color.setHex(0xffffff);
+            setTimeout(() => {
+              enemy.userData.bodyLines.material.color.setHex(originalColor);
+            }, 100);
+
+            enemy.userData.hit = true;
+            gameState.enemiesHit++;
+          }
+        });
+      }
+
+      // Update Environment
+      function updateEnvironment() {
+        if (gameState.gameOver) return;
+
+        // Physics Logic
+        if (keys.up) {
+          gameState.speed += gameState.acceleration;
+        } else if (keys.down) {
+          gameState.speed -= gameState.braking;
+        } else {
+          gameState.speed -= gameState.friction;
+        }
+
+        // Clamp speed
+        if (gameState.speed < 0) gameState.speed = 0;
+        if (gameState.speed > gameState.maxSpeed)
+          gameState.speed = gameState.maxSpeed;
+
+        const speedFactor = gameState.speed / 60;
+        gameState.distance += gameState.speed * 0.01;
+
+        // Move road segments
+        roadSegments.forEach((segment) => {
+          // Move segment towards camera
+          segment.position.z += speedFactor;
+
+          // Recycle segment
+          if (segment.position.z > 10) {
+            segment.userData.worldZ -= segmentCount * segmentLength;
+            segment.position.z -= segmentCount * segmentLength;
+          }
+
+          segment.position.x = 0;
+        });
+
+        // Rotate wheels
+        const wheelRotation = speedFactor * 0.2;
+        player.userData.wheels.forEach((wheel) => {
+          wheel.rotation.x -= wheelRotation;
+        });
+
+        // Update enemies
+        enemies.forEach((enemy, index) => {
+          enemy.position.z += speedFactor + enemy.userData.velocity;
+
+          // Enemy AI: Follow the road
+          // Find segment closest to enemy
+          let enemySegment = null;
+          let minEnemyZDist = 1000;
+          roadSegments.forEach((s) => {
+            const dist = Math.abs(s.position.z - enemy.position.z);
+            if (dist < minEnemyZDist) {
+              minEnemyZDist = dist;
+              enemySegment = s;
+            }
+          });
+
+          if (enemySegment) {
+            // Target X is segment X + lane offset
+            const targetX = enemySegment.position.x + enemy.userData.lane;
+            // Smoothly move towards target X
+            enemy.position.x += (targetX - enemy.position.x) * 0.1;
+          }
+
+          // Apply push velocity
+          if (enemy.userData.pushVelocity) {
+            enemy.position.x += enemy.userData.pushVelocity;
+            enemy.userData.pushVelocity *= 0.95;
+            if (Math.abs(enemy.userData.pushVelocity) < 0.01) {
+              enemy.userData.pushVelocity = 0;
+            }
+          }
+
+          // Rotate enemy wheels
+          enemy.userData.wheels.forEach((wheel) => {
+            wheel.rotation.x -= wheelRotation;
+          });
+
+          // Check collision with player
+          const dx = Math.abs(enemy.position.x - player.position.x);
+          const dz = Math.abs(enemy.position.z - player.position.z);
+          if (dx < 1 && dz < 2 && !enemy.userData.collided) {
+            enemy.userData.collided = true;
+            gameState.speed *= 0.7; // Slow down on collision
+          }
+
+          // Respawn if behind camera
+          if (enemy.position.z > 10) {
+            // Find furthest segment to spawn on
+            let lastSegment = roadSegments[0];
+            for (let s of roadSegments) {
+              if (s.position.z < lastSegment.position.z) lastSegment = s;
+            }
+
+            const lane =
+              (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2);
+            enemy.position.set(
+              lastSegment.position.x + lane,
+              0,
+              lastSegment.position.z
+            );
+            enemy.userData.velocity = 0.1 + Math.random() * 0.1;
+            enemy.userData.hit = false;
+            enemy.userData.collided = false;
+            enemy.userData.pushVelocity = 0;
+          }
+        });
+
+        // Update obstacles
+        obstacles.forEach((obstacle) => {
+          obstacle.position.z += speedFactor;
+
+          // Check collision with player
+          const dx = Math.abs(obstacle.position.x - player.position.x);
+          const dz = Math.abs(obstacle.position.z - player.position.z);
+          if (dx < 1.5 && dz < 2) {
+            triggerGameOver();
+          }
+
+          // Respawn if behind camera
+          if (obstacle.position.z > 10) {
+            // Find furthest segment
+            let lastSegment = roadSegments[0];
+            for (let s of roadSegments) {
+              if (s.position.z < lastSegment.position.z) lastSegment = s;
+            }
+
+            const side = Math.random() > 0.5 ? 1 : -1;
+            const type = obstacle.userData.type;
+            obstacle.position.set(
+              lastSegment.position.x + side * (5 + Math.random() * 3),
+              type === "rock" ? 0.5 : 1,
+              lastSegment.position.z
+            );
+          }
+        });
+
+        // Update Traffic Cars
+        trafficCars.forEach((car) => {
+          // Move towards player (Oncoming)
+          car.position.z += speedFactor + car.userData.speed;
+
+          // Collision Check
+          const dx = Math.abs(car.position.x - player.position.x);
+          const dz = Math.abs(car.position.z - player.position.z);
+
+          if (dx < 2 && dz < 3) {
+            console.log("CRASH WITH CAR");
+            gameState.speed = 0;
+            triggerGameOver();
+
+            // Camera Shake
+            camera.position.x += (Math.random() - 0.5) * 2;
+            camera.position.y += (Math.random() - 0.5) * 2;
+          }
+
+          // Respawn
+          if (car.position.z > 20) {
+            // Passed camera
+            const z = -200 - Math.random() * 200;
+            const lane = (Math.random() > 0.5 ? 1 : -1) * 5;
+            car.position.set(lane, 0, z);
+            car.userData.lane = lane;
+            car.userData.speed = 0.1 + Math.random() * 0.1; // Reset speed
+          }
+        });
+      }
+
+      // Update HUD
+      function updateHUD() {
+        document.getElementById("speed").textContent = Math.floor(
+          gameState.speed
+        );
+        document.getElementById("distance").textContent = Math.floor(
+          gameState.distance
+        );
+        document.getElementById("hits").textContent = gameState.enemiesHit;
+
+        const kickStatus = document.getElementById("kickStatus");
+        if (gameState.kickCooldown > 0) {
+          kickStatus.textContent = "COOLDOWN";
+          kickStatus.className = "cooldown";
+        } else {
+          kickStatus.textContent = "READY";
+          kickStatus.className = "ready";
+        }
+      }
+
+      // Game Over
+      function triggerGameOver() {
+        if (gameState.gameOver) return;
+        gameState.gameOver = true;
+        document.getElementById("gameOver").style.display = "block";
+        document.getElementById("finalDistance").textContent = Math.floor(
+          gameState.distance
+        );
+      }
+
+      // Restart Game
+      function restartGame() {
+        gameState.speed = 0;
+        gameState.distance = 0;
+        gameState.enemiesHit = 0;
+        gameState.kickCooldown = 0;
+        gameState.gameOver = false;
+        gameState.playerHealth = 3;
+        gameState.roadCurvature = 0;
+        gameState.targetCurvature = 0;
+
+        player.position.set(0, 0, 0);
+
+        // Reset road
+        for (let i = 0; i < segmentCount; i++) {
+          const segment = roadSegments[i];
+          segment.userData.worldZ = -i * segmentLength;
+          segment.position.set(0, -0.5, -i * segmentLength);
+        }
+
+        // Reset enemies
+        enemies.forEach((enemy, index) => {
+          const lane = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2);
+          const z = -30 - Math.random() * 50;
+
+          enemy.position.set(lane, 0, z);
+          enemy.userData.velocity = 0.1 + Math.random() * 0.1;
+          enemy.userData.hit = false;
+          enemy.userData.collided = false;
+          enemy.userData.pushVelocity = 0;
+        });
+
+        // Reset obstacles
+        obstacles.forEach((obstacle) => {
+          const side = Math.random() > 0.5 ? 1 : -1;
+          const type = obstacle.userData.type;
+          const z = -30 - Math.random() * 70;
+
+          obstacle.position.set(
+            side * (5 + Math.random() * 3),
+            type === "rock" ? 0.5 : 1,
+            z
+          );
+        });
+
+        // Reset Traffic
+        trafficCars.forEach((car) => {
+          const z = -100 - Math.random() * 200;
+          const lane = (Math.random() > 0.5 ? 1 : -1) * 5;
+          car.position.set(lane, 0, z);
+          car.userData.lane = lane;
+          car.userData.speed = 0.1 + Math.random() * 0.1;
+        });
+
+        document.getElementById("gameOver").style.display = "none";
+      }
+
+      // Window Resize Handler
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Game Loop
+      function animate() {
+        requestAnimationFrame(animate);
+
+        handleInput();
+        updateEnvironment();
+        updateHUD();
+
+        composer.render();
+      }
+
+      // Start the game
+      animate();
+    </script>
+  </body>
+</html>
