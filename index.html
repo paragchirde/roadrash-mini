@@ -618,6 +618,7 @@
         roadCurvature: 0,
         targetCurvature: 0,
         curveTimer: 0,
+        cameraShake: 0,
       };
 
       // Input State
@@ -734,81 +735,6 @@
       player.position.set(0, 0, 0);
       scene.add(player);
 
-      // Enemies Array
-      const enemies = [];
-      const maxEnemies = 5;
-
-      function spawnEnemy() {
-        const enemy = createBike(0xff00ff);
-        const lane = (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2);
-        enemy.position.set(lane, 0, -30 - Math.random() * 50);
-        enemy.userData.velocity = 0.1 + Math.random() * 0.1;
-        enemy.userData.lane = lane;
-        enemy.userData.hit = false;
-        scene.add(enemy);
-        enemies.push(enemy);
-      }
-
-      // Spawn initial enemies
-      for (let i = 0; i < maxEnemies; i++) {
-        spawnEnemy();
-      }
-
-      // Obstacles Array
-      const obstacles = [];
-      const maxObstacles = 15;
-
-      function spawnObstacle() {
-        const type = Math.random() > 0.5 ? "rock" : "tree";
-        let mesh;
-        const neonMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 }); // Yellow
-        const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-
-        if (type === "rock") {
-          const geometry = new THREE.BoxGeometry(1, 1, 1);
-          const base = new THREE.Mesh(geometry, blackMaterial);
-          const edges = new THREE.EdgesGeometry(geometry);
-          const lines = new THREE.LineSegments(edges, neonMaterial);
-          base.add(lines);
-          mesh = base;
-        } else {
-          mesh = new THREE.Group();
-
-          // Trunk
-          const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 2, 8);
-          const trunkBase = new THREE.Mesh(trunkGeometry, blackMaterial);
-          const trunkEdges = new THREE.EdgesGeometry(trunkGeometry);
-          const trunkLines = new THREE.LineSegments(trunkEdges, neonMaterial);
-          trunkBase.add(trunkLines);
-          mesh.add(trunkBase);
-
-          // Leaves
-          const leavesGeometry = new THREE.IcosahedronGeometry(0.8, 1);
-          const leavesBase = new THREE.Mesh(leavesGeometry, blackMaterial);
-          const leavesEdges = new THREE.EdgesGeometry(leavesGeometry);
-          const leavesLines = new THREE.LineSegments(leavesEdges, neonMaterial);
-          leavesBase.add(leavesLines);
-          leavesBase.position.y = 1.5;
-          mesh.add(leavesBase);
-        }
-
-        const side = Math.random() > 0.5 ? 1 : -1;
-        mesh.position.set(
-          side * (5 + Math.random() * 3),
-          type === "rock" ? 0.5 : 1,
-          -30 - Math.random() * 70
-        );
-        mesh.castShadow = true;
-        mesh.userData.type = type;
-        scene.add(mesh);
-        obstacles.push(mesh);
-      }
-
-      // Spawn initial obstacles
-      for (let i = 0; i < maxObstacles; i++) {
-        spawnObstacle();
-      }
-
       // Traffic Cars
       const trafficCars = [];
       const maxTraffic = 3;
@@ -856,6 +782,141 @@
       for (let i = 0; i < maxTraffic; i++) {
         spawnTrafficCar();
       }
+
+      // Enemies Array
+      const enemies = [];
+      const maxEnemies = 5;
+
+      function spawnEnemy() {
+        const enemy = createBike(0xff00ff);
+        
+        // Requirement 1: Continuous Random Spawning
+        const roadWidth = 20;
+        let x = (Math.random() - 0.5) * roadWidth * 0.8;
+
+        // Constraint: Avoid overlapping with Traffic Cars
+        let overlap = false;
+        trafficCars.forEach(car => {
+            // Check if car is roughly in the same Z zone where we spawn (-30 to -80)
+            // and if X is too close
+            if (car.position.z < -20 && Math.abs(car.position.x - x) < 3) {
+                overlap = true;
+            }
+        });
+
+        if (overlap) {
+            // Try to shift to the other side
+            x = x > 0 ? x - 5 : x + 5;
+        }
+
+        // Clamp to road
+        if (x < -9) x = -9;
+        if (x > 9) x = 9;
+
+        enemy.position.set(x, 0, -30 - Math.random() * 50);
+        enemy.userData.velocity = 0.1 + Math.random() * 0.1;
+        enemy.userData.hit = false;
+        
+        // Requirement 3: Weaving Parameters
+        enemy.userData.weaveOffset = Math.random() * 100;
+        enemy.userData.weaveSpeed = 0.002 + Math.random() * 0.002;
+
+        scene.add(enemy);
+        enemies.push(enemy);
+      }
+
+      // Spawn initial enemies
+      for (let i = 0; i < maxEnemies; i++) {
+        spawnEnemy();
+      }
+
+      // Obstacles Array
+      const obstacles = [];
+      const maxObstacles = 15;
+
+      function spawnObstacle() {
+        const type = Math.random() > 0.85 ? "rock" : "tree"; // Reduced rock frequency (15%)
+        let mesh;
+        const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+        if (type === "rock") {
+          // Requirement 2: Rocks
+          const geometry = new THREE.DodecahedronGeometry(0.5);
+          const base = new THREE.Mesh(geometry, blackMaterial);
+          const edges = new THREE.EdgesGeometry(geometry);
+          const lineMat = new THREE.LineBasicMaterial({ color: 0xff4500 }); // OrangeRed
+          const lines = new THREE.LineSegments(edges, lineMat);
+          base.add(lines);
+          mesh = base;
+          mesh.userData.isRock = true;
+        } else {
+          mesh = new THREE.Group();
+          const neonMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
+
+          // Trunk
+          const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 2, 8);
+          const trunkBase = new THREE.Mesh(trunkGeometry, blackMaterial);
+          const trunkEdges = new THREE.EdgesGeometry(trunkGeometry);
+          const trunkLines = new THREE.LineSegments(trunkEdges, neonMaterial);
+          trunkBase.add(trunkLines);
+          mesh.add(trunkBase);
+
+          // Leaves
+          const leavesGeometry = new THREE.IcosahedronGeometry(0.8, 1);
+          const leavesBase = new THREE.Mesh(leavesGeometry, blackMaterial);
+          const leavesEdges = new THREE.EdgesGeometry(leavesGeometry);
+          const leavesLines = new THREE.LineSegments(leavesEdges, neonMaterial);
+          leavesBase.add(leavesLines);
+          leavesBase.position.y = 1.5;
+          mesh.add(leavesBase);
+          
+          mesh.userData.isRock = false;
+        }
+
+        let x = 0;
+        if (type === "rock") {
+            // Requirement 2: Block safe lanes
+            // Check where traffic is
+            let leftBlocked = false;
+            let rightBlocked = false;
+            
+            trafficCars.forEach(car => {
+                if (car.position.z < -10 && car.position.z > -100) {
+                    if (car.position.x < -2) leftBlocked = true;
+                    if (car.position.x > 2) rightBlocked = true;
+                }
+            });
+
+            if (leftBlocked && !rightBlocked) {
+                x = 4 + Math.random() * 2; // Block right
+            } else if (!leftBlocked && rightBlocked) {
+                x = -4 - Math.random() * 2; // Block left
+            } else {
+                x = (Math.random() - 0.5) * 10; // Random center
+            }
+        } else {
+            // Trees on side
+            const side = Math.random() > 0.5 ? 1 : -1;
+            x = side * (6 + Math.random() * 4);
+        }
+
+        mesh.position.set(
+          x,
+          type === "rock" ? 0.5 : 1,
+          -30 - Math.random() * 70
+        );
+        mesh.castShadow = true;
+        mesh.userData.type = type;
+        scene.add(mesh);
+        obstacles.push(mesh);
+      }
+
+      // Spawn initial obstacles
+      for (let i = 0; i < maxObstacles; i++) {
+        spawnObstacle();
+      }
+
+
 
       // Create Road
       const roadSegments = [];
@@ -983,6 +1044,17 @@
       function updateEnvironment() {
         if (!gameState.started || gameState.gameOver) return;
 
+        // Camera Shake Logic
+        if (gameState.cameraShake > 0) {
+            camera.position.x = (Math.random() - 0.5) * gameState.cameraShake;
+            camera.position.y = 5 + (Math.random() - 0.5) * gameState.cameraShake;
+            gameState.cameraShake *= 0.9; // Decay
+            if (gameState.cameraShake < 0.1) {
+                gameState.cameraShake = 0;
+                camera.position.set(0, 5, 10); // Reset
+            }
+        }
+
         // Physics Logic
         if (keys.up) {
           gameState.speed += gameState.acceleration;
@@ -1032,24 +1104,14 @@
         enemies.forEach((enemy, index) => {
           enemy.position.z += speedFactor + enemy.userData.velocity;
 
-          // Enemy AI: Follow the road
-          // Find segment closest to enemy
-          let enemySegment = null;
-          let minEnemyZDist = 1000;
-          roadSegments.forEach((s) => {
-            const dist = Math.abs(s.position.z - enemy.position.z);
-            if (dist < minEnemyZDist) {
-              minEnemyZDist = dist;
-              enemySegment = s;
-            }
-          });
+          // Requirement 3: Weaving AI
+          const time = Date.now();
+          const weave = Math.sin(time * enemy.userData.weaveSpeed + enemy.userData.weaveOffset) * 0.05;
+          enemy.position.x += weave;
 
-          if (enemySegment) {
-            // Target X is segment X + lane offset
-            const targetX = enemySegment.position.x + enemy.userData.lane;
-            // Smoothly move towards target X
-            enemy.position.x += (targetX - enemy.position.x) * 0.1;
-          }
+          // Clamp to road
+          if (enemy.position.x < -9) enemy.position.x = -9;
+          if (enemy.position.x > 9) enemy.position.x = 9;
 
           // Apply push velocity
           if (enemy.userData.pushVelocity) {
@@ -1075,19 +1137,21 @@
 
           // Respawn if behind camera
           if (enemy.position.z > 10) {
-            // Find furthest segment to spawn on
-            let lastSegment = roadSegments[0];
-            for (let s of roadSegments) {
-              if (s.position.z < lastSegment.position.z) lastSegment = s;
-            }
+            const roadWidth = 20;
+            let x = (Math.random() - 0.5) * roadWidth * 0.8;
+            
+            // Avoid traffic overlap
+            let overlap = false;
+            trafficCars.forEach(car => {
+                if (car.position.z < -20 && Math.abs(car.position.x - x) < 3) {
+                    overlap = true;
+                }
+            });
+            if (overlap) x = x > 0 ? x - 5 : x + 5;
+            if (x < -9) x = -9;
+            if (x > 9) x = 9;
 
-            const lane =
-              (Math.random() > 0.5 ? 1 : -1) * (2 + Math.random() * 2);
-            enemy.position.set(
-              lastSegment.position.x + lane,
-              0,
-              lastSegment.position.z
-            );
+            enemy.position.set(x, 0, -100 - Math.random() * 50);
             enemy.userData.velocity = 0.1 + Math.random() * 0.1;
             enemy.userData.hit = false;
             enemy.userData.collided = false;
@@ -1102,8 +1166,32 @@
           // Check collision with player
           const dx = Math.abs(obstacle.position.x - player.position.x);
           const dz = Math.abs(obstacle.position.z - player.position.z);
+          
           if (dx < 1.5 && dz < 2) {
-            triggerGameOver();
+            if (obstacle.userData.isRock) {
+                // Requirement 2: Rock Collision -> Massive Deceleration
+                gameState.speed *= 0.1;
+                // Trigger controlled camera shake
+                gameState.cameraShake = 1.5;
+                // Hide rock to prevent multi-collision
+                obstacle.position.y = -10;
+            } else {
+                triggerGameOver();
+            }
+          }
+
+          // Requirement 3: Enemy Collision with Rocks
+          if (obstacle.userData.isRock) {
+              enemies.forEach((enemy, eIdx) => {
+                  const edx = Math.abs(obstacle.position.x - enemy.position.x);
+                  const edz = Math.abs(obstacle.position.z - enemy.position.z);
+                  if (edx < 1.5 && edz < 2) {
+                      // Enemy Explodes (Remove and Respawn)
+                      scene.remove(enemy);
+                      enemies.splice(eIdx, 1);
+                      spawnEnemy();
+                  }
+              });
           }
 
           // Respawn if behind camera
@@ -1114,13 +1202,35 @@
               if (s.position.z < lastSegment.position.z) lastSegment = s;
             }
 
-            const side = Math.random() > 0.5 ? 1 : -1;
             const type = obstacle.userData.type;
+            let x = 0;
+            
+            if (type === "rock") {
+                // Block safe lanes logic
+                let leftBlocked = false;
+                let rightBlocked = false;
+                trafficCars.forEach(car => {
+                    if (car.position.z < -10 && car.position.z > -100) {
+                        if (car.position.x < -2) leftBlocked = true;
+                        if (car.position.x > 2) rightBlocked = true;
+                    }
+                });
+
+                if (leftBlocked && !rightBlocked) x = 5;
+                else if (!leftBlocked && rightBlocked) x = -5;
+                else x = (Math.random() - 0.5) * 10;
+            } else {
+                const side = Math.random() > 0.5 ? 1 : -1;
+                x = side * (6 + Math.random() * 4);
+            }
+
             obstacle.position.set(
-              lastSegment.position.x + side * (5 + Math.random() * 3),
+              x,
               type === "rock" ? 0.5 : 1,
               lastSegment.position.z
             );
+            // Reset visibility if it was hidden
+            if (type === "rock") obstacle.position.y = 0.5;
           }
         });
 
